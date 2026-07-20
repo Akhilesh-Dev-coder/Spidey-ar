@@ -5,7 +5,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Spidey WebAR Experience</title>
-    <meta name="description" content="An interactive Spider-Verse WebAR experience built with Three.js. Scan the poster, open the portal, and showcase Spider-Man.">
+    <!-- Console warning filter for A-Frame useLegacyLights -->
+    <script>
+        const originalWarn = console.warn;
+        console.warn = function (...args) {
+            if (args[0] && typeof args[0] === 'string' && args[0].includes('useLegacyLights')) {
+                return;
+            }
+            originalWarn.apply(console, args);
+        };
+    </script>
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
