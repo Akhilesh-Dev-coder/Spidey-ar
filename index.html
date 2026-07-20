@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Spidey WebAR Experience</title>
-    <meta name="description" content="An interactive Spider-Verse WebAR experience. Scan the poster, open the dimension portal, and choose your Spider-Man suit.">
+    <meta name="description" content="An interactive Spider-Verse WebAR experience. Scan the poster, open the portal, and summon Spider-Man in your room.">
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -396,23 +396,24 @@
             align-items: center;
             width: 100%;
             pointer-events: auto;
-            gap: 12px;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
         .hud-btn {
             background: rgba(15, 15, 20, 0.8);
             border: 1px solid var(--card-border);
             color: #fff;
-            padding: 12px 24px;
+            padding: 12px 20px;
             border-radius: 50px;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 600;
             cursor: pointer;
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
             transition: all 0.2s;
         }
@@ -432,6 +433,18 @@
         .hud-btn-primary:hover {
             border-color: transparent;
             box-shadow: 0 12px 30px rgba(216, 0, 39, 0.6);
+        }
+
+        .hud-btn-accent {
+            border-color: var(--accent-green);
+            background: rgba(0, 230, 118, 0.1);
+            color: #fff;
+        }
+
+        .hud-btn-accent:hover {
+            background: rgba(0, 230, 118, 0.2);
+            border-color: var(--accent-green);
+            box-shadow: 0 10px 25px var(--accent-green-glow);
         }
 
         /* Modal Overlay for displaying target image */
@@ -533,6 +546,33 @@
         .mindar-ui-overlay {
             display: none !important;
         }
+        
+        /* Drag helper text in Room Mode */
+        #room-instructions {
+            position: fixed;
+            bottom: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 15, 20, 0.85);
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #fff;
+            border: 1px solid var(--card-border);
+            z-index: 100;
+            text-align: center;
+            width: max-content;
+            max-width: 90%;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            letter-spacing: 0.5px;
+        }
+        
+        #room-instructions.active {
+            opacity: 1;
+        }
     </style>
 </head>
 
@@ -552,6 +592,9 @@
             <button class="btn btn-secondary" id="view-target-btn">View Target Card</button>
         </div>
     </div>
+
+    <!-- Drag Instructions in Room Mode -->
+    <div id="room-instructions"> Swipe left/right to rotate Spider-Man in your room!</div>
 
     <!-- Scanning HUD Overlay -->
     <div id="scanning-hud" class="hidden">
@@ -574,7 +617,10 @@
             <button class="hud-btn" id="view-target-hud-btn">
                 <span>📁</span> Target
             </button>
-            <button class="hud-btn hud-btn-primary" id="shoot-web-btn">
+            <button class="hud-btn hud-btn-accent" id="room-mode-btn" style="display: none;">
+                <span>✨</span> Summon in Room
+            </button>
+            <button class="hud-btn hud-btn-primary" id="shoot-web-btn" style="display: none;">
                 <span>🕸️</span> THWIP!
             </button>
         </div>
@@ -597,7 +643,7 @@
         color-space="sRGB" renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true;"
         vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
 
-        <!-- Camera with 3D Interaction Cursor -->
+        <!-- Camera with 3D Interaction Cursor (look-controls is toggled in JS for Room Mode) -->
         <a-camera position="0 0 0" look-controls="enabled: false">
             <a-cursor fuse="false" raycaster="objects: .clickable" color="#ff3e3e" scale="1.5 1.5 1.5"></a-cursor>
         </a-camera>
@@ -659,7 +705,7 @@
                 <!-- Head -->
                 <a-sphere class="spidey-red" color="#d32f2f" radius="0.06" scale="1 1.25 1" position="0 0.18 0.03"></a-sphere>
                 
-                <!-- Eyes (Black outline + White centers) -->
+                <!-- Eyes -->
                 <a-circle color="#000000" radius="0.018" position="-0.02 0.18 0.088" scale="1 1.6 1" rotation="0 0 -22"></a-circle>
                 <a-circle color="#000000" radius="0.018" position="0.02 0.18 0.088" scale="1 1.6 1" rotation="0 0 22"></a-circle>
                 <a-circle color="#ffffff" radius="0.013" position="-0.018 0.18 0.09" scale="1 1.6 1" rotation="0 0 -22"></a-circle>
@@ -672,7 +718,7 @@
                 <!-- Spider Logo on Chest -->
                 <a-circle class="spidey-logo" color="#000000" radius="0.008" position="0 0.07 0.052" scale="1 1.5 1"></a-circle>
                 
-                <!-- Left Arm (Clinging pose) -->
+                <!-- Left Arm -->
                 <a-cylinder class="spidey-red" color="#d32f2f" radius="0.014" height="0.08" position="-0.07 0.09 0.02" rotation="40 0 -35"></a-cylinder>
                 <a-cylinder class="spidey-blue" color="#0d47a1" radius="0.011" height="0.08" position="-0.1 0.03 0.04" rotation="20 0 -50"></a-cylinder>
                 
@@ -680,15 +726,15 @@
                 <a-cylinder class="spidey-red" color="#d32f2f" radius="0.014" height="0.08" position="0.07 0.09 0.02" rotation="45 0 35"></a-cylinder>
                 <a-cylinder class="spidey-red" color="#d32f2f" radius="0.011" height="0.08" position="0.12 0.13 0.06" rotation="90 0 45"></a-cylinder>
                 
-                <!-- 3D Web Thread Shooting Out to side -->
+                <!-- 3D Web Thread -->
                 <a-cylinder color="#ffffff" radius="0.002" height="1.4" position="0.32 0.52 0.05" rotation="-42 0 18" 
                             opacity="0.85" material="shader: flat;"></a-cylinder>
 
-                <!-- Left Leg (Clinging) -->
+                <!-- Left Leg -->
                 <a-cylinder class="spidey-blue" color="#0d47a1" radius="0.016" height="0.09" position="-0.04 -0.09 0.02" rotation="-25 25 -15"></a-cylinder>
                 <a-cylinder class="spidey-red" color="#d32f2f" radius="0.013" height="0.08" position="-0.07 -0.15 0.04" rotation="-55 15 -10"></a-cylinder>
 
-                <!-- Right Leg (Clinging) -->
+                <!-- Right Leg -->
                 <a-cylinder class="spidey-blue" color="#0d47a1" radius="0.016" height="0.09" position="0.04 -0.09 0.02" rotation="-25 -25 15"></a-cylinder>
                 <a-cylinder class="spidey-red" color="#d32f2f" radius="0.013" height="0.08" position="0.07 -0.15 0.04" rotation="-55 -15 10"></a-cylinder>
 
@@ -698,6 +744,51 @@
             <a-entity light="type: point; color: #ff3e3e; intensity: 1.5; distance: 1.5;" position="0 -0.2 0.25"></a-entity>
             <a-entity light="type: point; color: #3b82f6; intensity: 1.5; distance: 1.5;" position="0 0.2 0.25"></a-entity>
 
+        </a-entity>
+
+        <!-- World-anchored Spider-Man (Used for Surface Room Showcase Mode) -->
+        <a-entity id="world-spidey-container" position="0 -0.4 -1.0" scale="0 0 0" visible="false">
+            <!-- Neon blue showcase pedestal platform -->
+            <a-cylinder color="#214068" radius="0.25" height="0.02" position="0 0 0" opacity="0.85" material="roughness: 0.2; metalness: 0.8;"></a-cylinder>
+            <a-ring color="#ff3e3e" radius-inner="0.24" radius-outer="0.25" position="0 0.01 0" rotation="90 0 0" material="shader: flat;"></a-ring>
+            
+            <!-- Upright Spider-Man Character (Rotatable via touch dragging) -->
+            <a-entity id="world-spidey" position="0 0 0" rotation="0 0 0">
+                <!-- Head -->
+                <a-sphere class="spidey-red" color="#d32f2f" radius="0.06" scale="1 1.25 1" position="0 0.42 0"></a-sphere>
+                
+                <!-- Eyes -->
+                <a-circle color="#000000" radius="0.018" position="-0.02 0.42 0.058" scale="1 1.6 1" rotation="0 0 -22"></a-circle>
+                <a-circle color="#000000" radius="0.018" position="0.02 0.42 0.058" scale="1 1.6 1" rotation="0 0 22"></a-circle>
+                <a-circle color="#ffffff" radius="0.013" position="-0.018 0.42 0.06" scale="1 1.6 1" rotation="0 0 -22"></a-circle>
+                <a-circle color="#ffffff" radius="0.013" position="0.018 0.42 0.06" scale="1 1.6 1" rotation="0 0 22"></a-circle>
+                
+                <!-- Torso -->
+                <a-box class="spidey-red" color="#d32f2f" width="0.09" height="0.15" depth="0.06" position="0 0.3 0"></a-box>
+                <a-box class="spidey-blue" color="#0d47a1" width="0.09" height="0.06" depth="0.06" position="0 0.2 0"></a-box>
+
+                <!-- Spider Logo -->
+                <a-circle class="spidey-logo" color="#000000" radius="0.008" position="0 0.31 0.032" scale="1 1.5 1"></a-circle>
+                
+                <!-- Left Arm (Hero Stand Pose) -->
+                <a-cylinder class="spidey-red" color="#d32f2f" radius="0.014" height="0.08" position="-0.07 0.31 0" rotation="30 0 20"></a-cylinder>
+                <a-cylinder class="spidey-blue" color="#0d47a1" radius="0.011" height="0.08" position="-0.09 0.24 0.02" rotation="45 0 30"></a-cylinder>
+                
+                <!-- Right Arm (Web Shooter Forward Pose) -->
+                <a-cylinder class="spidey-red" color="#d32f2f" radius="0.014" height="0.08" position="0.07 0.31 0" rotation="-30 0 -20"></a-cylinder>
+                <a-cylinder class="spidey-red" color="#d32f2f" radius="0.011" height="0.08" position="0.09 0.24 0.02" rotation="-45 0 -30"></a-cylinder>
+
+                <!-- Left Leg (Upright stand) -->
+                <a-cylinder class="spidey-blue" color="#0d47a1" radius="0.016" height="0.1" position="-0.04 0.11 0" rotation="0 0 6"></a-cylinder>
+                <a-cylinder class="spidey-red" color="#d32f2f" radius="0.013" height="0.09" position="-0.05 0.04 0" rotation="0 0 6"></a-cylinder>
+
+                <!-- Right Leg (Upright stand) -->
+                <a-cylinder class="spidey-blue" color="#0d47a1" radius="0.016" height="0.1" position="0.04 0.11 0" rotation="0 0 -6"></a-cylinder>
+                <a-cylinder class="spidey-red" color="#d32f2f" radius="0.013" height="0.09" position="0.05 0.04 0" rotation="0 0 -6"></a-cylinder>
+            </a-entity>
+            
+            <!-- Platform glow dynamic lights -->
+            <a-entity light="type: point; color: #ff3e3e; intensity: 1.2; distance: 1.0;" position="0 0.1 0.2"></a-entity>
         </a-entity>
 
         <!-- Ambient & Directional Lights -->
@@ -718,9 +809,15 @@
         const modalCloseBtn = document.getElementById('modal-close-btn');
         
         const shootWebBtn = document.getElementById('shoot-web-btn');
+        const roomModeBtn = document.getElementById('room-mode-btn');
+        const roomInstructions = document.getElementById('room-instructions');
 
         const sceneEl = document.querySelector('a-scene');
         const spiderTarget = document.getElementById('spider-target');
+        const worldSpideyContainer = document.getElementById('world-spidey-container');
+        const cameraEl = document.querySelector('a-camera');
+
+        let isRoomMode = false;
 
         // Start AR Experience
         startBtn.addEventListener('click', () => {
@@ -747,7 +844,7 @@
             if (e.target === targetModal) closeModal();
         });
 
-        // Interactive Suit Configuration Logic
+        // Interactive Suit Configuration Logic (Updates both models)
         const suitColors = {
             classic: {
                 red: "#d32f2f",
@@ -784,7 +881,11 @@
             // Quick visual tap feedback on HUD badge
             statusText.textContent = `Suit: ${suitType.toUpperCase()}`;
             setTimeout(() => {
-                statusText.textContent = "Target Locked: Spider-Man";
+                if (isRoomMode) {
+                    statusText.textContent = "Showcasing Spidey in your Room";
+                } else {
+                    statusText.textContent = "Target Locked: Spider-Man";
+                }
             }, 2000);
         }
 
@@ -792,34 +893,131 @@
         document.getElementById('btn-miles').addEventListener('click', () => setSuit('miles'));
         document.getElementById('btn-2099').addEventListener('click', () => setSuit('2099'));
 
-        // Interactive 3D Web Shooter
+        // Interactive 3D Web Shooter (Adapted for both poster and room mode)
         shootWebBtn.addEventListener('click', () => {
-            // Create a temporary 3D web projectile sphere
             const web = document.createElement('a-sphere');
             web.setAttribute('color', '#ffffff');
             web.setAttribute('radius', '0.015');
-            
-            // Position near Spider-Man's forward-pointing hand (taking parent scale into account)
-            web.setAttribute('position', '0.1 0.12 0.08'); 
             web.setAttribute('material', 'shader: flat; opacity: 0.95;');
+
+            if (!isRoomMode) {
+                // Shoot from poster-anchored Spiderman wrist
+                web.setAttribute('position', '0.1 0.12 0.08'); 
+                web.setAttribute('animation', 'property: position; to: 0 0 0.8; dur: 500; easing: easeOutQuad;');
+                web.setAttribute('animation__scale', 'property: scale; to: 25 25 25; dur: 500; easing: easeOutQuad;');
+                web.setAttribute('animation__opacity', 'property: opacity; to: 0; dur: 500; easing: easeInQuad;');
+                spiderTarget.appendChild(web);
+            } else {
+                // Shoot from world-anchored Spiderman wrist relative to spidey container
+                web.setAttribute('position', '0.09 0.24 0.02');
+                // The camera is at (0, 0.4, 1) relative to the container positioned at (0, -0.4, -1)
+                web.setAttribute('animation', 'property: position; to: 0 0.4 1; dur: 500; easing: easeOutQuad;');
+                web.setAttribute('animation__scale', 'property: scale; to: 25 25 25; dur: 500; easing: easeOutQuad;');
+                web.setAttribute('animation__opacity', 'property: opacity; to: 0; dur: 500; easing: easeInQuad;');
+                worldSpideyContainer.appendChild(web);
+            }
             
-            // Shoot web directly towards phone camera (Z direction)
-            web.setAttribute('animation', 'property: position; to: 0 0 0.8; dur: 500; easing: easeOutQuad;');
-            web.setAttribute('animation__scale', 'property: scale; to: 25 25 25; dur: 500; easing: easeOutQuad;');
-            web.setAttribute('animation__opacity', 'property: opacity; to: 0; dur: 500; easing: easeInQuad;');
-            
-            spiderTarget.appendChild(web);
-            
-            // Delete projectile after animation is complete
             setTimeout(() => {
                 web.remove();
             }, 500);
         });
 
+        // Toggle Room Showcase Mode
+        roomModeBtn.addEventListener('click', () => {
+            const arSystem = sceneEl.systems["mindar-image-system"];
+            if (!arSystem) return;
+
+            if (!isRoomMode) {
+                isRoomMode = true;
+                
+                // 1. Pause tracking, keep camera
+                arSystem.pause(true);
+                
+                // 2. Enable camera gyroscope look-controls
+                cameraEl.setAttribute('look-controls', 'enabled: true');
+                
+                // 3. Reset building walls and hide poster assets
+                document.getElementById('left-wall').removeAttribute('animation');
+                document.getElementById('left-wall').setAttribute('position', '-0.225 0 0.01');
+                document.getElementById('right-wall').removeAttribute('animation');
+                document.getElementById('right-wall').setAttribute('position', '0.225 0 0.01');
+                document.getElementById('portal-ring').removeAttribute('animation');
+                document.getElementById('portal-ring').setAttribute('scale', '0 0 0');
+                document.getElementById('quote-bubble').removeAttribute('animation');
+                document.getElementById('quote-bubble').setAttribute('scale', '0 0 0');
+                document.querySelectorAll('.suit-card').forEach(card => {
+                    card.removeAttribute('animation');
+                    card.setAttribute('scale', '0 0 0');
+                });
+                
+                // 4. Reveal and slide-up the world-anchored Spiderman
+                worldSpideyContainer.setAttribute('visible', 'true');
+                worldSpideyContainer.setAttribute('animation', 'property: scale; from: 0 0 0; to: 1 1 1; dur: 800; easing: easeOutBack; fill: forwards');
+                
+                // 5. Update HUD state
+                roomModeBtn.innerHTML = "<span>🎴</span> Return to Poster";
+                statusText.textContent = "Showcasing Spidey in your Room";
+                roomInstructions.classList.add('active');
+                
+                // Hide target card buttons
+                viewTargetHudBtn.style.display = 'none';
+            } else {
+                isRoomMode = false;
+                
+                // 1. Reset camera gyroscope and position
+                cameraEl.setAttribute('look-controls', 'enabled: false');
+                cameraEl.setAttribute('rotation', '0 0 0');
+                
+                // 2. Hide room model
+                worldSpideyContainer.setAttribute('scale', '0 0 0');
+                worldSpideyContainer.setAttribute('visible', 'false');
+                
+                // 3. Unpause tracking
+                arSystem.unpause();
+                
+                // 4. Reset HUD
+                roomModeBtn.innerHTML = "<span>✨</span> Summon in Room";
+                statusText.textContent = "Scanning Target...";
+                roomInstructions.classList.remove('active');
+                
+                viewTargetHudBtn.style.display = 'flex';
+            }
+        });
+
+        // 3D Touch Rotation Dragging in Room Mode
+        let startX;
+        window.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                startX = e.touches[0].clientX;
+            }
+        });
+        
+        window.addEventListener('touchmove', (e) => {
+            if (isRoomMode && e.touches.length === 1 && startX !== undefined) {
+                const deltaX = e.touches[0].clientX - startX;
+                const spideyWorld = document.getElementById('world-spidey');
+                
+                let rotation = spideyWorld.getAttribute('rotation');
+                if (typeof rotation === 'string') {
+                    rotation = AFrame.utils.coordinates.parse(rotation);
+                }
+                
+                rotation.y += deltaX * 0.4; // rotation speed factor
+                spideyWorld.setAttribute('rotation', rotation);
+                startX = e.touches[0].clientX;
+            }
+        });
+
         // MindAR Event Listeners for Target tracking status updates
         spiderTarget.addEventListener('targetFound', () => {
+            if (isRoomMode) return; // Prevent target override when in showcase mode
+
             scanningHud.classList.add('detected');
             statusText.textContent = "Target Locked: Spider-Man";
+
+            // Reveal interactive HUD buttons
+            shootWebBtn.style.display = 'flex';
+            roomModeBtn.style.display = 'flex';
 
             // 1. Slide open the skyscraper glass panels
             document.getElementById('left-wall').setAttribute('animation', 'property: position; to: -0.675 0 0.01; dur: 1200; easing: easeOutQuad; fill: forwards');
@@ -838,10 +1036,16 @@
         });
 
         spiderTarget.addEventListener('targetLost', () => {
+            if (isRoomMode) return; // Maintain showcase mode visible
+
             scanningHud.classList.remove('detected');
             statusText.textContent = "Scanning Target...";
 
-            // Reset elements back to default states instantly to prevent layout leaks
+            // Hide action buttons
+            shootWebBtn.style.display = 'none';
+            roomModeBtn.style.display = 'none';
+
+            // Reset elements back to default states instantly
             document.getElementById('left-wall').removeAttribute('animation');
             document.getElementById('left-wall').setAttribute('position', '-0.225 0 0.01');
             
