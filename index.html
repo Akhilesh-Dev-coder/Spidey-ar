@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Spidey WebAR Experience</title>
-    <meta name="description" content="An interactive Spider-Verse WebAR experience. Scan the poster, open the portal, and summon Spider-Man in your room.">
+    <meta name="description" content="An interactive Spider-Verse WebAR experience built with Three.js. Scan the poster, open the portal, and showcase Spider-Man.">
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -546,7 +546,7 @@
         .mindar-ui-overlay {
             display: none !important;
         }
-        
+
         /* Drag helper text in Room Mode */
         #room-instructions {
             position: fixed;
@@ -569,7 +569,7 @@
             pointer-events: none;
             letter-spacing: 0.5px;
         }
-        
+
         #room-instructions.active {
             opacity: 1;
         }
@@ -594,7 +594,346 @@
     </div>
 
     <!-- Drag Instructions in Room Mode -->
-    <div id="room-instructions"> Swipe left/right to rotate Spider-Man in your room!</div>
+    <div id="room-instructions">Swipe left/right to rotate Spider-Man in your room!</div>
+
+    <!-- Scanning HUD Overlay -->
+    <div id="scanning-hud" class="hidden">
+        <div class="hud-header">
+            <div class="hud-badge">
+                <div class="badge-dot"></div>
+                <div class="badge-text" id="status-text">Scanning Target...</div>
+            </div>
+        </div>
+
+        <div class="hud-center">
+            <div class="reticle-corner corner-tl"></div>
+            <div class="reticle-corner corner-tr"></div>
+            <div class="reticle-corner corner-bl"></div>
+            <div class="reticle-corner corner-br"></div>
+            <div class="scan-line"></div>
+        </div>
+
+        <div class="hud-footer">
+            <button class="hud-btn" id="view-target-hud-btn">
+                <span>📁</span> Target
+            </button>
+            <button class="hud-btn hud-btn-accent" id="room-mode-btn" style="display: none;">
+                <span>✨</span> Summon in Room
+            </button>
+            <button class="hud-btn hud-btn-primary" id="shoot-web-btn" style="display: none;">
+                <span>🕸️</span> THWIP!
+            </button>
+        </div>
+    </div>
+
+    <!-- Target Preview Modal -->
+    <div id="target-modal">
+        <div class="modal-card">
+            <div class="modal-close" id="modal-close-btn">&times;</div>
+            <h2 class="modal-title">Tracking Target Image</h2>
+            <p class="modal-desc">Point your device camera at this image to bring the 3D Spider to life.</p>
+            <div class="target-image-container">
+                <img src="assets/spidey.jpg" alt="AR Tracking Target Spidey Card">
+            </div>
+        </div>
+    </div>
+
+    <!-- Interactive Suit Colors Data -->
+    <script>
+        const suitColors = {
+            classic: {
+                red: "#d32f2f",
+                blue: "#0d47a1",
+                logo: "#000000"
+            },
+            miles: {
+                red: "#141416",
+                blue: "#d32f2f",
+                logo: "#e53935"
+            },
+            2099: {
+                red: "#07111e",
+                blue: "#ff003c",
+                logo: "#ff003c"
+            }
+        };
+
+        const quotes = {
+            classic: "With great power comes great responsibility.",
+            miles: "Anyone can wear the mask.",
+            2099: "I am the futuristic Spider-Man."
+        };
+    </script>
+
+    <!-- Custom Three.js Model Registration Component -->
+    <script>
+        AFRAME.registerComponent('spidey-model', {
+            schema: {
+                suitType: { type: 'string', default: 'classic' },
+                pose: { type: 'string', default: 'upsideDown' } // 'upsideDown' or 'standing'
+            },
+
+            init: function () {
+                this.modelGroup = new THREE.Group();
+                this.el.setObject3D('mesh', this.modelGroup);
+                this.buildModel();
+            },
+
+            update: function () {
+                this.updateSuitColors();
+            },
+
+            buildModel: function () {
+                // Clear existing groups
+                while (this.modelGroup.children.length > 0) {
+                    this.modelGroup.remove(this.modelGroup.children[0]);
+                }
+
+                // 1. Create a dynamic Canvas Texture for the Suit's Web line pattern
+                this.createSuitTexture();
+
+                // 2. Set up base Three.js materials
+                this.suitRedMat = new THREE.MeshStandardMaterial({
+                    map: this.canvasTexture,
+                    roughness: 0.35,
+                    metalness: 0.15
+                });
+
+                this.suitBlueMat = new THREE.MeshStandardMaterial({
+                    color: new THREE.Color(0x0d47a1),
+                    roughness: 0.4,
+                    metalness: 0.1
+                });
+
+                this.blackMat = new THREE.MeshBasicMaterial({ color: 0x070709 });
+                this.whiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+                // 3. Build Head (Ovoid shape)
+                const headGeo = new THREE.SphereGeometry(0.06, 24, 24);
+                headGeo.scale(1, 1.25, 1);
+                this.head = new THREE.Mesh(headGeo, this.suitRedMat);
+                
+                // Adjust position based on pose
+                if (this.data.pose === 'upsideDown') {
+                    this.head.position.set(0, 0.18, 0.03);
+                } else {
+                    this.head.position.set(0, 0.42, 0);
+                }
+                this.modelGroup.add(this.head);
+
+                // Head Eyes (Black outlines + white lenses)
+                const eyeBlackGeo = new THREE.CircleGeometry(0.018, 24);
+                eyeBlackGeo.scale(1, 1.6, 1);
+                
+                const eyeWhiteGeo = new THREE.CircleGeometry(0.013, 24);
+                eyeWhiteGeo.scale(1, 1.6, 1);
+
+                const leftEyeBlack = new THREE.Mesh(eyeBlackGeo, this.blackMat);
+                const rightEyeBlack = new THREE.Mesh(eyeBlackGeo, this.blackMat);
+                const leftEyeWhite = new THREE.Mesh(eyeWhiteGeo, this.whiteMat);
+                const rightEyeWhite = new THREE.Mesh(eyeWhiteGeo, this.whiteMat);
+
+                if (this.data.pose === 'upsideDown') {
+                    leftEyeBlack.position.set(-0.02, 0.18, 0.088);
+                    leftEyeBlack.rotation.set(0, 0, -0.38); // -22 degrees
+
+                    rightEyeBlack.position.set(0.02, 0.18, 0.088);
+                    rightEyeBlack.rotation.set(0, 0, 0.38);
+
+                    leftEyeWhite.position.set(-0.018, 0.18, 0.09);
+                    leftEyeWhite.rotation.set(0, 0, -0.38);
+
+                    rightEyeWhite.position.set(0.018, 0.18, 0.09);
+                    rightEyeWhite.rotation.set(0, 0, 0.38);
+                } else {
+                    leftEyeBlack.position.set(-0.02, 0.42, 0.058);
+                    leftEyeBlack.rotation.set(0, 0, -0.38);
+
+                    rightEyeBlack.position.set(0.02, 0.42, 0.058);
+                    rightEyeBlack.rotation.set(0, 0, 0.38);
+
+                    leftEyeWhite.position.set(-0.018, 0.42, 0.06);
+                    leftEyeWhite.rotation.set(0, 0, -0.38);
+
+                    rightEyeWhite.position.set(0.018, 0.42, 0.06);
+                    rightEyeWhite.rotation.set(0, 0, 0.38);
+                }
+
+                this.modelGroup.add(leftEyeBlack, rightEyeBlack, leftEyeWhite, rightEyeWhite);
+
+                // 4. Build Torso (Upper Chest Red + Lower Waist Blue)
+                const chestGeo = new THREE.BoxGeometry(0.09, 0.15, 0.06);
+                const waistGeo = new THREE.BoxGeometry(0.09, 0.06, 0.06);
+                
+                this.chest = new THREE.Mesh(chestGeo, this.suitRedMat);
+                this.waist = new THREE.Mesh(waistGeo, this.suitBlueMat);
+
+                if (this.data.pose === 'upsideDown') {
+                    this.chest.position.set(0, 0.06, 0.02);
+                    this.waist.position.set(0, -0.04, 0.02);
+                } else {
+                    this.chest.position.set(0, 0.3, 0);
+                    this.waist.position.set(0, 0.2, 0);
+                }
+                this.modelGroup.add(this.chest, this.waist);
+
+                // Spider Logo (Circle on chest)
+                const logoGeo = new THREE.CircleGeometry(0.008, 16);
+                logoGeo.scale(1, 1.5, 1);
+                this.logo = new THREE.Mesh(logoGeo, this.blackMat);
+                
+                if (this.data.pose === 'upsideDown') {
+                    this.logo.position.set(0, 0.07, 0.052);
+                } else {
+                    this.logo.position.set(0, 0.31, 0.032);
+                }
+                this.modelGroup.add(this.logo);
+
+                // 5. Build Limbs (Arms & Legs)
+                const armUpperGeo = new THREE.CylinderGeometry(0.014, 0.014, 0.08, 12);
+                const armForeGeo = new THREE.CylinderGeometry(0.011, 0.011, 0.08, 12);
+                const thighGeo = new THREE.CylinderGeometry(0.016, 0.016, 0.09, 12);
+                const shinGeo = new THREE.CylinderGeometry(0.013, 0.013, 0.08, 12);
+
+                this.leftUpperArm = new THREE.Mesh(armUpperGeo, this.suitRedMat);
+                this.leftForearm = new THREE.Mesh(armForeGeo, this.suitBlueMat);
+                this.rightUpperArm = new THREE.Mesh(armUpperGeo, this.suitRedMat);
+                this.rightForearm = new THREE.Mesh(armForeGeo, this.suitRedMat);
+                
+                this.leftThigh = new THREE.Mesh(thighGeo, this.suitBlueMat);
+                this.leftShin = new THREE.Mesh(shinGeo, this.suitRedMat);
+                this.rightThigh = new THREE.Mesh(thighGeo, this.suitBlueMat);
+                this.rightShin = new THREE.Mesh(shinGeo, this.suitRedMat);
+
+                if (this.data.pose === 'upsideDown') {
+                    // Clinging Pose
+                    this.leftUpperArm.position.set(-0.07, 0.09, 0.02);
+                    this.leftUpperArm.rotation.set(0.7, 0, -0.6);
+                    this.leftForearm.position.set(-0.1, 0.03, 0.04);
+                    this.leftForearm.rotation.set(0.35, 0, -0.87);
+
+                    this.rightUpperArm.position.set(0.07, 0.09, 0.02);
+                    this.rightUpperArm.rotation.set(0.78, 0, 0.6);
+                    this.rightForearm.position.set(0.12, 0.13, 0.06);
+                    this.rightForearm.rotation.set(1.57, 0, 0.78);
+
+                    this.leftThigh.position.set(-0.04, -0.09, 0.02);
+                    this.leftThigh.rotation.set(-0.43, 0.43, -0.26);
+                    this.leftShin.position.set(-0.07, -0.15, 0.04);
+                    this.leftShin.rotation.set(-0.96, 0.26, -0.17);
+
+                    this.rightThigh.position.set(0.04, -0.09, 0.02);
+                    this.rightThigh.rotation.set(-0.43, -0.43, 0.26);
+                    this.rightShin.position.set(0.07, -0.15, 0.04);
+                    this.rightShin.rotation.set(-0.96, -0.26, 0.17);
+                } else {
+                    // Upright Hero Standing Pose
+                    this.leftUpperArm.position.set(-0.07, 0.31, 0);
+                    this.leftUpperArm.rotation.set(0.5, 0, 0.35);
+                    this.leftForearm.position.set(-0.09, 0.24, 0.02);
+                    this.leftForearm.rotation.set(0.78, 0, 0.52);
+
+                    this.rightUpperArm.position.set(0.07, 0.31, 0);
+                    this.rightUpperArm.rotation.set(-0.5, 0, -0.35);
+                    this.rightForearm.position.set(0.09, 0.24, 0.02);
+                    this.rightForearm.rotation.set(-0.78, 0, -0.52);
+
+                    this.leftThigh.position.set(-0.03, 0.11, 0);
+                    this.leftThigh.rotation.set(0, 0, 0.1);
+                    this.leftShin.position.set(-0.03, 0.04, 0);
+                    this.leftShin.rotation.set(0, 0, 0.1);
+
+                    this.rightThigh.position.set(0.03, 0.11, 0);
+                    this.rightThigh.rotation.set(0, 0, -0.1);
+                    this.rightShin.position.set(0.03, 0.04, 0);
+                    this.rightShin.rotation.set(0, 0, -0.1);
+                }
+
+                this.modelGroup.add(
+                    this.leftUpperArm, this.leftForearm, 
+                    this.rightUpperArm, this.rightForearm,
+                    this.leftThigh, this.leftShin,
+                    this.rightThigh, this.rightShin
+                );
+            },
+
+            createSuitTexture: function () {
+                // Dynamically paint a 2D web texture to apply onto the Standard Red material
+                this.canvas = document.createElement('canvas');
+                this.canvas.width = 256;
+                this.canvas.height = 256;
+                this.ctx = this.canvas.getContext('2d');
+                
+                this.canvasTexture = new THREE.CanvasTexture(this.canvas);
+                this.canvasTexture.wrapS = THREE.RepeatWrapping;
+                this.canvasTexture.wrapT = THREE.RepeatWrapping;
+                this.canvasTexture.repeat.set(1.5, 1.5);
+            },
+
+            updateSuitColors: function () {
+                const suit = this.data.suitType;
+                const colors = suitColors[suit];
+                if (!colors) return;
+
+                // 1. Redraw web canvas lines with target colors
+                this.ctx.fillStyle = colors.red;
+                this.ctx.fillRect(0, 0, 256, 256);
+                this.ctx.strokeStyle = suit === 'miles' ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.35)';
+                this.ctx.lineWidth = 2.5;
+
+                // Draw spiderwebs grid
+                for (let i = 0; i < 256; i += 32) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(i, 0);
+                    this.ctx.lineTo(i, 256);
+                    this.ctx.stroke();
+                }
+                for (let j = 0; j < 256; j += 32) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, j);
+                    this.ctx.bezierCurveTo(64, j - 12, 192, j - 12, 256, j);
+                    this.ctx.stroke();
+                }
+                this.canvasTexture.needsUpdate = true;
+
+                // 2. Update mesh colors/materials
+                if (this.suitBlueMat) {
+                    this.suitBlueMat.color.set(colors.blue);
+                    
+                    // In Miles suit, forearm is also black (suitRedMat). Adjust arm color accordingly.
+                    if (suit === 'miles') {
+                        this.leftForearm.material = this.suitRedMat;
+                    } else {
+                        this.leftForearm.material = this.suitBlueMat;
+                    }
+                }
+                if (this.logo) {
+                    this.logo.material.color.set(colors.logo);
+                }
+            }
+        });
+    </script>
+</head>
+
+<body>
+
+    <!-- Start / Landing Screen -->
+    <div id="start-screen">
+        <div class="glass-card">
+            <div class="logo-container">
+                <div class="logo-icon">🕷️</div>
+            </div>
+            <h1>Spidey WebAR</h1>
+            <p class="description">
+                Experience an immersive 3D Spider-Man projection. Scan the Spidey movie poster card to manifest the model on your screen.
+            </p>
+            <button class="btn btn-primary" id="start-btn">Start AR Camera</button>
+            <button class="btn btn-secondary" id="view-target-btn">View Target Card</button>
+        </div>
+    </div>
+
+    <!-- Drag Instructions in Room Mode -->
+    <div id="room-instructions">Swipe left/right to rotate Spider-Man in your room!</div>
 
     <!-- Scanning HUD Overlay -->
     <div id="scanning-hud" class="hidden">
@@ -695,50 +1034,18 @@
                 <a-text value="2099" align="center" width="0.75" position="0 -0.01 0.01" color="#ff003c" font="mozillavr"></a-text>
             </a-circle>
 
-            <!-- Stylized Upside-Down Spider-Man Character (Stylized Low-Poly) -->
+            <!-- Custom 3D Spider-Man Model (Upside-down pose) -->
             <a-entity id="spiderman-character" 
                       position="0 0 0.08" 
                       rotation="0 0 180" 
+                      spidey-model="suitType: classic; pose: upsideDown"
                       animation="property: position; from: 0 -0.12 0.08; to: 0 0.12 0.08; dir: alternate; loop: true; dur: 4500; easing: easeInOutSine"
                       animation__sway="property: rotation; from: 0 0 172; to: 0 0 188; dir: alternate; loop: true; dur: 3200; easing: easeInOutSine">
-                
-                <!-- Head -->
-                <a-sphere class="spidey-red" color="#d32f2f" radius="0.06" scale="1 1.25 1" position="0 0.18 0.03"></a-sphere>
-                
-                <!-- Eyes -->
-                <a-circle color="#000000" radius="0.018" position="-0.02 0.18 0.088" scale="1 1.6 1" rotation="0 0 -22"></a-circle>
-                <a-circle color="#000000" radius="0.018" position="0.02 0.18 0.088" scale="1 1.6 1" rotation="0 0 22"></a-circle>
-                <a-circle color="#ffffff" radius="0.013" position="-0.018 0.18 0.09" scale="1 1.6 1" rotation="0 0 -22"></a-circle>
-                <a-circle color="#ffffff" radius="0.013" position="0.018 0.18 0.09" scale="1 1.6 1" rotation="0 0 22"></a-circle>
-                
-                <!-- Torso (Red upper body + Blue lower body) -->
-                <a-box class="spidey-red" color="#d32f2f" width="0.09" height="0.15" depth="0.06" position="0 0.06 0.02"></a-box>
-                <a-box class="spidey-blue" color="#0d47a1" width="0.09" height="0.06" depth="0.06" position="0 -0.04 0.02"></a-box>
-
-                <!-- Spider Logo on Chest -->
-                <a-circle class="spidey-logo" color="#000000" radius="0.008" position="0 0.07 0.052" scale="1 1.5 1"></a-circle>
-                
-                <!-- Left Arm -->
-                <a-cylinder class="spidey-red" color="#d32f2f" radius="0.014" height="0.08" position="-0.07 0.09 0.02" rotation="40 0 -35"></a-cylinder>
-                <a-cylinder class="spidey-blue" color="#0d47a1" radius="0.011" height="0.08" position="-0.1 0.03 0.04" rotation="20 0 -50"></a-cylinder>
-                
-                <!-- Right Arm (Web-Shooting Pose) -->
-                <a-cylinder class="spidey-red" color="#d32f2f" radius="0.014" height="0.08" position="0.07 0.09 0.02" rotation="45 0 35"></a-cylinder>
-                <a-cylinder class="spidey-red" color="#d32f2f" radius="0.011" height="0.08" position="0.12 0.13 0.06" rotation="90 0 45"></a-cylinder>
-                
-                <!-- 3D Web Thread -->
-                <a-cylinder color="#ffffff" radius="0.002" height="1.4" position="0.32 0.52 0.05" rotation="-42 0 18" 
-                            opacity="0.85" material="shader: flat;"></a-cylinder>
-
-                <!-- Left Leg -->
-                <a-cylinder class="spidey-blue" color="#0d47a1" radius="0.016" height="0.09" position="-0.04 -0.09 0.02" rotation="-25 25 -15"></a-cylinder>
-                <a-cylinder class="spidey-red" color="#d32f2f" radius="0.013" height="0.08" position="-0.07 -0.15 0.04" rotation="-55 15 -10"></a-cylinder>
-
-                <!-- Right Leg -->
-                <a-cylinder class="spidey-blue" color="#0d47a1" radius="0.016" height="0.09" position="0.04 -0.09 0.02" rotation="-25 -25 15"></a-cylinder>
-                <a-cylinder class="spidey-red" color="#d32f2f" radius="0.013" height="0.08" position="0.07 -0.15 0.04" rotation="-55 -15 10"></a-cylinder>
-
             </a-entity>
+
+            <!-- 3D Web Thread -->
+            <a-cylinder color="#ffffff" radius="0.002" height="1.4" position="0.32 0.52 0.05" rotation="-42 0 18" 
+                        opacity="0.85" material="shader: flat;"></a-cylinder>
 
             <!-- Dynamic Cyber Red/Blue Spotlights -->
             <a-entity light="type: point; color: #ff3e3e; intensity: 1.5; distance: 1.5;" position="0 -0.2 0.25"></a-entity>
@@ -752,39 +1059,8 @@
             <a-cylinder color="#214068" radius="0.25" height="0.02" position="0 0 0" opacity="0.85" material="roughness: 0.2; metalness: 0.8;"></a-cylinder>
             <a-ring color="#ff3e3e" radius-inner="0.24" radius-outer="0.25" position="0 0.01 0" rotation="90 0 0" material="shader: flat;"></a-ring>
             
-            <!-- Upright Spider-Man Character (Rotatable via touch dragging) -->
-            <a-entity id="world-spidey" position="0 0 0" rotation="0 0 0">
-                <!-- Head -->
-                <a-sphere class="spidey-red" color="#d32f2f" radius="0.06" scale="1 1.25 1" position="0 0.42 0"></a-sphere>
-                
-                <!-- Eyes -->
-                <a-circle color="#000000" radius="0.018" position="-0.02 0.42 0.058" scale="1 1.6 1" rotation="0 0 -22"></a-circle>
-                <a-circle color="#000000" radius="0.018" position="0.02 0.42 0.058" scale="1 1.6 1" rotation="0 0 22"></a-circle>
-                <a-circle color="#ffffff" radius="0.013" position="-0.018 0.42 0.06" scale="1 1.6 1" rotation="0 0 -22"></a-circle>
-                <a-circle color="#ffffff" radius="0.013" position="0.018 0.42 0.06" scale="1 1.6 1" rotation="0 0 22"></a-circle>
-                
-                <!-- Torso -->
-                <a-box class="spidey-red" color="#d32f2f" width="0.09" height="0.15" depth="0.06" position="0 0.3 0"></a-box>
-                <a-box class="spidey-blue" color="#0d47a1" width="0.09" height="0.06" depth="0.06" position="0 0.2 0"></a-box>
-
-                <!-- Spider Logo -->
-                <a-circle class="spidey-logo" color="#000000" radius="0.008" position="0 0.31 0.032" scale="1 1.5 1"></a-circle>
-                
-                <!-- Left Arm (Hero Stand Pose) -->
-                <a-cylinder class="spidey-red" color="#d32f2f" radius="0.014" height="0.08" position="-0.07 0.31 0" rotation="30 0 20"></a-cylinder>
-                <a-cylinder class="spidey-blue" color="#0d47a1" radius="0.011" height="0.08" position="-0.09 0.24 0.02" rotation="45 0 30"></a-cylinder>
-                
-                <!-- Right Arm (Web Shooter Forward Pose) -->
-                <a-cylinder class="spidey-red" color="#d32f2f" radius="0.014" height="0.08" position="0.07 0.31 0" rotation="-30 0 -20"></a-cylinder>
-                <a-cylinder class="spidey-red" color="#d32f2f" radius="0.011" height="0.08" position="0.09 0.24 0.02" rotation="-45 0 -30"></a-cylinder>
-
-                <!-- Left Leg (Upright stand) -->
-                <a-cylinder class="spidey-blue" color="#0d47a1" radius="0.016" height="0.1" position="-0.04 0.11 0" rotation="0 0 6"></a-cylinder>
-                <a-cylinder class="spidey-red" color="#d32f2f" radius="0.013" height="0.09" position="-0.05 0.04 0" rotation="0 0 6"></a-cylinder>
-
-                <!-- Right Leg (Upright stand) -->
-                <a-cylinder class="spidey-blue" color="#0d47a1" radius="0.016" height="0.1" position="0.04 0.11 0" rotation="0 0 -6"></a-cylinder>
-                <a-cylinder class="spidey-red" color="#d32f2f" radius="0.013" height="0.09" position="0.05 0.04 0" rotation="0 0 -6"></a-cylinder>
+            <!-- Custom 3D Spider-Man Model (Upright standing, rotatable) -->
+            <a-entity id="world-spidey" position="0 0 0" rotation="0 0 0" spidey-model="suitType: classic; pose: standing">
             </a-entity>
             
             <!-- Platform glow dynamic lights -->
@@ -844,36 +1120,10 @@
             if (e.target === targetModal) closeModal();
         });
 
-        // Interactive Suit Configuration Logic (Updates both models)
-        const suitColors = {
-            classic: {
-                red: "#d32f2f",
-                blue: "#0d47a1",
-                logo: "#000000"
-            },
-            miles: {
-                red: "#141416",
-                blue: "#d32f2f",
-                logo: "#e53935"
-            },
-            2099: {
-                red: "#07111e",
-                blue: "#ff003c",
-                logo: "#ff003c"
-            }
-        };
-
-        const quotes = {
-            classic: "With great power comes great responsibility.",
-            miles: "Anyone can wear the mask.",
-            2099: "I am the futuristic Spider-Man."
-        };
-
         function setSuit(suitType) {
-            const colors = suitColors[suitType];
-            document.querySelectorAll('.spidey-red').forEach(el => el.setAttribute('color', colors.red));
-            document.querySelectorAll('.spidey-blue').forEach(el => el.setAttribute('color', colors.blue));
-            document.querySelectorAll('.spidey-logo').forEach(el => el.setAttribute('color', colors.logo));
+            // Set attributes to trigger the A-Frame / Three.js component updates
+            document.getElementById('spiderman-character').setAttribute('spidey-model', 'suitType', suitType);
+            document.getElementById('world-spidey').setAttribute('spidey-model', 'suitType', suitType);
             
             // Update speech bubble text
             document.getElementById('quote-text').setAttribute('value', quotes[suitType]);
@@ -893,7 +1143,7 @@
         document.getElementById('btn-miles').addEventListener('click', () => setSuit('miles'));
         document.getElementById('btn-2099').addEventListener('click', () => setSuit('2099'));
 
-        // Interactive 3D Web Shooter (Adapted for both poster and room mode)
+        // Interactive 3D Web Shooter
         shootWebBtn.addEventListener('click', () => {
             const web = document.createElement('a-sphere');
             web.setAttribute('color', '#ffffff');
@@ -902,7 +1152,7 @@
 
             if (!isRoomMode) {
                 // Shoot from poster-anchored Spiderman wrist
-                web.setAttribute('position', '0.1 0.12 0.08'); 
+                web.setAttribute('position', '0.12 0.13 0.06'); 
                 web.setAttribute('animation', 'property: position; to: 0 0 0.8; dur: 500; easing: easeOutQuad;');
                 web.setAttribute('animation__scale', 'property: scale; to: 25 25 25; dur: 500; easing: easeOutQuad;');
                 web.setAttribute('animation__opacity', 'property: opacity; to: 0; dur: 500; easing: easeInQuad;');
@@ -1002,7 +1252,7 @@
                     rotation = AFrame.utils.coordinates.parse(rotation);
                 }
                 
-                rotation.y += deltaX * 0.4; // rotation speed factor
+                rotation.y += deltaX * 0.45; // rotation speed factor
                 spideyWorld.setAttribute('rotation', rotation);
                 startX = e.touches[0].clientX;
             }
