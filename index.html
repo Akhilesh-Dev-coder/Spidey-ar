@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arachnid WebAR Experience</title>
+    <meta name="description" content="An immersive WebAR experience bringing a 3D spider to life when scanning the target image. Built with MindAR and A-Frame.">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+
+    <!-- A-Frame -->
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+
+    <!-- MindAR -->
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
+    <style>
+        /* CSS Variables & Custom Theme */
+        :root {
+            --primary: #ff3e3e;
+            --primary-glow: rgba(255, 62, 62, 0.4);
+            --bg-dark: #0b0b0e;
+            --card-bg: rgba(18, 18, 24, 0.65);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --text-light: #f5f5f7;
+            --text-muted: #8e8e93;
+            --accent-green: #00E676;
+            --accent-green-glow: rgba(0, 230, 118, 0.4);
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Loading & Start Screen Overlay */
+        #start-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 9999;
+            background: radial-gradient(circle at center, #1e1212 0%, var(--bg-dark) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            transition: opacity 0.5s ease-out, visibility 0.5s;
+        }
+
+        #start-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .glass-card {
+            width: 90%;
+            max-width: 440px;
+            padding: 40px 30px;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 28px;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .glass-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), #ff7b00);
+        }
+
+        .logo-container {
+            margin-bottom: 24px;
+            position: relative;
+            display: inline-block;
+        }
+
+        .logo-icon {
+            width: 72px;
+            height: 72px;
+            background: rgba(255, 62, 62, 0.1);
+            border: 2px solid var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: var(--primary);
+            box-shadow: 0 0 20px var(--primary-glow);
+            animation: pulse-glow 2.5s infinite;
+        }
+
+        @keyframes pulse-glow {
+            0% {
+                box-shadow: 0 0 10px var(--primary-glow);
+                transform: scale(1);
+            }
+
+            50% {
+                box-shadow: 0 0 25px rgba(255, 62, 62, 0.7);
+                transform: scale(1.05);
+            }
+
+            100% {
+                box-shadow: 0 0 10px var(--primary-glow);
+                transform: scale(1);
+            }
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 800;
+            margin: 0 0 12px 0;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #fff 30%, #ffd2d2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .description {
+            font-size: 15px;
+            line-height: 1.6;
+            color: var(--text-muted);
+            margin-bottom: 32px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 16px 24px;
+            border-radius: 14px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            border: none;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, #e02424 100%);
+            color: #fff;
+            box-shadow: 0 8px 24px rgba(224, 36, 36, 0.35);
+            margin-bottom: 12px;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 28px rgba(224, 36, 36, 0.5);
+        }
+
+        .btn-primary:active {
+            transform: translateY(1px);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-light);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Scanning HUD */
+        #scanning-hud {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 100;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-sizing: border-box;
+            padding: 24px;
+            transition: opacity 0.3s;
+        }
+
+        #scanning-hud.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* HUD Top Bar */
+        .hud-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            pointer-events: auto;
+        }
+
+        .hud-badge {
+            background: rgba(15, 15, 20, 0.75);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--card-border);
+            padding: 10px 18px;
+            border-radius: 50px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+        }
+
+        .badge-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--primary);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--primary);
+            animation: pulse-dot 1.5s infinite;
+        }
+
+        @keyframes pulse-dot {
+            0% {
+                opacity: 0.4;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0.4;
+            }
+        }
+
+        .badge-text {
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        /* When target detected, change badge style */
+        .detected .badge-dot {
+            background-color: var(--accent-green);
+            box-shadow: 0 0 10px var(--accent-green);
+        }
+
+        .detected .badge-text {
+            color: var(--accent-green);
+        }
+
+        /* HUD Scanner Reticle */
+        .hud-center {
+            align-self: center;
+            position: relative;
+            width: 280px;
+            height: 280px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.3s ease;
+        }
+
+        /* Reticle corners */
+        .reticle-corner {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            transition: border-color 0.3s, transform 0.3s;
+        }
+
+        .corner-tl {
+            top: 0;
+            left: 0;
+            border-right: none;
+            border-bottom: none;
+            border-top-left-radius: 12px;
+        }
+
+        .corner-tr {
+            top: 0;
+            right: 0;
+            border-left: none;
+            border-bottom: none;
+            border-top-right-radius: 12px;
+        }
+
+        .corner-bl {
+            bottom: 0;
+            left: 0;
+            border-right: none;
+            border-top: none;
+            border-bottom-left-radius: 12px;
+        }
+
+        .corner-br {
+            bottom: 0;
+            right: 0;
+            border-left: none;
+            border-top: none;
+            border-bottom-right-radius: 12px;
+        }
+
+        /* Rotating dashed helper */
+        .hud-center::before {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            border: 1px dashed rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            animation: rotate-dashed 20s linear infinite;
+        }
+
+        @keyframes rotate-dashed {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Scan line animation */
+        .scan-line {
+            position: absolute;
+            left: 15px;
+            right: 15px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--primary), transparent);
+            box-shadow: 0 0 8px var(--primary);
+            animation: scan-move 3s ease-in-out infinite;
+        }
+
+        @keyframes scan-move {
+            0% {
+                top: 15px;
+                opacity: 0.1;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                top: 265px;
+                opacity: 0.1;
+            }
+        }
+
+        /* Detected HUD styles */
+        .detected .reticle-corner {
+            border-color: var(--accent-green);
+            box-shadow: 0 0 10px var(--accent-green-glow);
+        }
+
+        .detected .scan-line {
+            background: linear-gradient(90deg, transparent, var(--accent-green), transparent);
+            box-shadow: 0 0 8px var(--accent-green);
+            animation-duration: 1.5s;
+        }
+
+        .detected .hud-center {
+            transform: scale(1.05);
+        }
+
+        /* HUD Bottom controls */
+        .hud-footer {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            pointer-events: auto;
+        }
+
+        .hud-btn {
+            background: rgba(15, 15, 20, 0.8);
+            border: 1px solid var(--card-border);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+            transition: all 0.2s;
+        }
+
+        .hud-btn:hover {
+            background: rgba(25, 25, 35, 0.9);
+            border-color: rgba(255, 62, 62, 0.3);
+            transform: translateY(-2px);
+        }
+
+        /* Modal Overlay for displaying target image */
+        #target-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10000;
+            background: rgba(7, 7, 10, 0.85);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+
+        #target-modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-card {
+            width: 90%;
+            max-width: 380px;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 28px;
+            padding: 30px 24px;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 36px;
+            height: 36px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--text-light);
+            font-size: 18px;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: scale(1.05);
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin: 0 0 8px 0;
+            text-align: center;
+        }
+
+        .modal-desc {
+            font-size: 14px;
+            color: var(--text-muted);
+            text-align: center;
+            margin-bottom: 24px;
+            max-width: 360px;
+            line-height: 1.5;
+        }
+
+        .target-image-container {
+            width: 100%;
+            aspect-ratio: 2 / 3;
+            max-height: 60vh;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 2px solid rgba(255, 62, 62, 0.3);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            background: #111;
+        }
+
+        .target-image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        /* Override MindAR UI Styles to maintain native layout */
+        .mindar-ui-overlay {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Start / Landing Screen -->
+    <div id="start-screen">
+        <div class="glass-card">
+            <div class="logo-container">
+                <div class="logo-icon">🕷️</div>
+            </div>
+            <h1>Spidey WebAR</h1>
+            <p class="description">
+                Experience an immersive 3D Spider-Man projection. Scan the Spidey movie poster card to manifest the model on your screen.
+            </p>
+            <button class="btn btn-primary" id="start-btn">Start AR Camera</button>
+            <button class="btn btn-secondary" id="view-target-btn">View Target Card</button>
+        </div>
+    </div>
+
+    <!-- Scanning HUD Overlay -->
+    <div id="scanning-hud" class="hidden">
+        <div class="hud-header">
+            <div class="hud-badge">
+                <div class="badge-dot"></div>
+                <div class="badge-text" id="status-text">Scanning Target...</div>
+            </div>
+        </div>
+
+        <div class="hud-center">
+            <div class="reticle-corner corner-tl"></div>
+            <div class="reticle-corner corner-tr"></div>
+            <div class="reticle-corner corner-bl"></div>
+            <div class="reticle-corner corner-br"></div>
+            <div class="scan-line"></div>
+        </div>
+
+        <div class="hud-footer">
+            <button class="hud-btn" id="view-target-hud-btn">
+                <span>📁</span> View Target Card
+            </button>
+        </div>
+    </div>
+
+    <!-- Target Preview Modal -->
+    <div id="target-modal">
+        <div class="modal-card">
+            <div class="modal-close" id="modal-close-btn">&times;</div>
+            <h2 class="modal-title">Tracking Target Image</h2>
+            <p class="modal-desc">Point your device camera at this image to bring the 3D Spider to life.</p>
+            <div class="target-image-container">
+                <img src="assets/spidey.jpg" alt="AR Tracking Target Spidey Card">
+            </div>
+        </div>
+    </div>
+
+    <!-- A-Frame / MindAR Scene -->
+    <a-scene mindar-image="imageTargetSrc: assets/targets.mind; autoStart: false; filterMinCF:0.001; filterBeta: 10;"
+        color-space="sRGB" renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true;"
+        vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+
+        <!-- Camera -->
+        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+        <!-- Image Target (targetIndex 0 corresponds to assets/targets.mind compilation) -->
+        <a-entity mindar-image-target="targetIndex: 0" id="spider-target">
+            
+            <!-- 3D Skyscraper Wall Backdrop -->
+            <a-plane color="#0b1d33" opacity="0.65" width="0.9" height="1.35" position="0 0 0.01" 
+                     material="roughness: 0.1; metalness: 0.9;"></a-plane>
+            
+            <!-- Skyscraper Window Frames -->
+            <a-box color="#214068" width="0.012" height="1.35" depth="0.012" position="-0.45 0 0.015"></a-box>
+            <a-box color="#214068" width="0.012" height="1.35" depth="0.012" position="0.45 0 0.015"></a-box>
+            <a-box color="#214068" width="0.012" height="1.35" depth="0.012" position="0 0 0.015"></a-box>
+            <a-box color="#214068" width="0.9" height="0.012" depth="0.012" position="0 0.45 0.015"></a-box>
+            <a-box color="#214068" width="0.9" height="0.012" depth="0.012" position="0 -0.45 0.015"></a-box>
+
+            <!-- Stylized Upside-Down Spider-Man Character (Stylized Low-Poly) -->
+            <a-entity id="spiderman-character" 
+                      position="0 0 0.08" 
+                      rotation="0 0 180" 
+                      animation="property: position; from: 0 -0.15 0.08; to: 0 0.15 0.08; dir: alternate; loop: true; dur: 4500; easing: easeInOutSine"
+                      animation__sway="property: rotation; from: 0 0 172; to: 0 0 188; dir: alternate; loop: true; dur: 3200; easing: easeInOutSine">
+                
+                <!-- Head -->
+                <a-sphere color="#d32f2f" radius="0.06" scale="1 1.25 1" position="0 0.18 0.03"></a-sphere>
+                
+                <!-- Eyes (Black outline + White centers) -->
+                <a-circle color="#000000" radius="0.018" position="-0.02 0.18 0.088" scale="1 1.6 1" rotation="0 0 -22"></a-circle>
+                <a-circle color="#000000" radius="0.018" position="0.02 0.18 0.088" scale="1 1.6 1" rotation="0 0 22"></a-circle>
+                <a-circle color="#ffffff" radius="0.013" position="-0.018 0.18 0.09" scale="1 1.6 1" rotation="0 0 -22"></a-circle>
+                <a-circle color="#ffffff" radius="0.013" position="0.018 0.18 0.09" scale="1 1.6 1" rotation="0 0 22"></a-circle>
+                
+                <!-- Torso (Red upper body + Blue lower body) -->
+                <a-box color="#d32f2f" width="0.09" height="0.15" depth="0.06" position="0 0.06 0.02"></a-box>
+                <a-box color="#0d47a1" width="0.09" height="0.06" depth="0.06" position="0 -0.04 0.02"></a-box>
+
+                <!-- Spider Logo on Chest -->
+                <a-circle color="#000000" radius="0.008" position="0 0.07 0.052" scale="1 1.5 1"></a-circle>
+                
+                <!-- Left Arm (Clinging pose) -->
+                <a-cylinder color="#d32f2f" radius="0.014" height="0.08" position="-0.07 0.09 0.02" rotation="40 0 -35"></a-cylinder>
+                <a-cylinder color="#0d47a1" radius="0.011" height="0.08" position="-0.1 0.03 0.04" rotation="20 0 -50"></a-cylinder>
+                
+                <!-- Right Arm (Web-Shooting Pose) -->
+                <a-cylinder color="#d32f2f" radius="0.014" height="0.08" position="0.07 0.09 0.02" rotation="45 0 35"></a-cylinder>
+                <a-cylinder color="#d32f2f" radius="0.011" height="0.08" position="0.12 0.13 0.06" rotation="90 0 45"></a-cylinder>
+                
+                <!-- 3D Web Thread Shooting Out -->
+                <a-cylinder color="#ffffff" radius="0.002" height="1.4" position="0.32 0.52 0.05" rotation="-42 0 18" 
+                            opacity="0.85" material="shader: flat;"></a-cylinder>
+
+                <!-- Left Leg (Clinging) -->
+                <a-cylinder color="#0d47a1" radius="0.016" height="0.09" position="-0.04 -0.09 0.02" rotation="-25 25 -15"></a-cylinder>
+                <a-cylinder color="#d32f2f" radius="0.013" height="0.08" position="-0.07 -0.15 0.04" rotation="-55 15 -10"></a-cylinder>
+
+                <!-- Right Leg (Clinging) -->
+                <a-cylinder color="#0d47a1" radius="0.016" height="0.09" position="0.04 -0.09 0.02" rotation="-25 -25 15"></a-cylinder>
+                <a-cylinder color="#d32f2f" radius="0.013" height="0.08" position="0.07 -0.15 0.04" rotation="-55 -15 10"></a-cylinder>
+
+            </a-entity>
+
+            <!-- Dynamic Cyber Red/Blue Spotlights -->
+            <a-entity light="type: point; color: #ff3e3e; intensity: 1.5; distance: 1.5;" position="0 -0.2 0.25"></a-entity>
+            <a-entity light="type: point; color: #3b82f6; intensity: 1.5; distance: 1.5;" position="0 0.2 0.25"></a-entity>
+
+        </a-entity>
+
+        <!-- Ambient & Directional Lights -->
+        <a-entity light="type: ambient; color: #ffffff; intensity: 0.8"></a-entity>
+        <a-entity light="type: directional; color: #ffffff; intensity: 0.8" position="1 2 1"></a-entity>
+
+    </a-scene>
+
+    <script>
+        const startScreen = document.getElementById('start-screen');
+        const startBtn = document.getElementById('start-btn');
+        const scanningHud = document.getElementById('scanning-hud');
+        const statusText = document.getElementById('status-text');
+
+        const targetModal = document.getElementById('target-modal');
+        const viewTargetBtn = document.getElementById('view-target-btn');
+        const viewTargetHudBtn = document.getElementById('view-target-hud-btn');
+        const modalCloseBtn = document.getElementById('modal-close-btn');
+
+        const sceneEl = document.querySelector('a-scene');
+        const spiderTarget = document.getElementById('spider-target');
+
+        // Start AR Experience
+        startBtn.addEventListener('click', () => {
+            const arSystem = sceneEl.systems["mindar-image-system"];
+            if (arSystem) {
+                startScreen.classList.add('hidden');
+                scanningHud.classList.remove('hidden');
+                arSystem.start();
+            } else {
+                alert("The AR system is still initializing. Please wait 2 seconds and try again.");
+            }
+        });
+
+        // Target Modal handlers
+        const openModal = () => targetModal.classList.add('active');
+        const closeModal = () => targetModal.classList.remove('active');
+
+        viewTargetBtn.addEventListener('click', openModal);
+        viewTargetHudBtn.addEventListener('click', openModal);
+        modalCloseBtn.addEventListener('click', closeModal);
+
+        // Also close modal when clicking outside the card
+        targetModal.addEventListener('click', (e) => {
+            if (e.target === targetModal) closeModal();
+        });
+
+        // MindAR Event Listeners for Target tracking status updates
+        spiderTarget.addEventListener('targetFound', () => {
+            scanningHud.classList.add('detected');
+            statusText.textContent = "Target Locked: Spider-Man";
+        });
+
+        spiderTarget.addEventListener('targetLost', () => {
+            scanningHud.classList.remove('detected');
+            statusText.textContent = "Scanning Target...";
+        });
+    </script>
+</body>
+
+</html>
