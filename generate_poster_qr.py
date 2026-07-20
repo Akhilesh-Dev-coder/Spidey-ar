@@ -60,7 +60,7 @@ def generate_qr_poster(target_url, input_poster_path, output_poster_path):
         os.remove(temp_qr_path)
 
 if __name__ == "__main__":
-    url = "https://spidey.netlify.app"
+    url = "https://spideyar.netlify.app/"
     input_path = "assets/spidey.jpg"
     output_path = "assets/spidey.jpg" # Overwrites to automatically update WebAR preview
     generate_qr_poster(url, input_path, output_path)
