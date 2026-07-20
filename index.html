@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arachnid WebAR Experience</title>
-    <meta name="description" content="An immersive WebAR experience bringing a 3D spider to life when scanning the target image. Built with MindAR and A-Frame.">
+    <title>Spidey WebAR Experience</title>
+    <meta name="description" content="An interactive Spider-Verse WebAR experience. Scan the poster, open the dimension portal, and choose your Spider-Man suit.">
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -393,8 +393,10 @@
         .hud-footer {
             display: flex;
             justify-content: center;
+            align-items: center;
             width: 100%;
             pointer-events: auto;
+            gap: 12px;
         }
 
         .hud-btn {
@@ -419,6 +421,17 @@
             background: rgba(25, 25, 35, 0.9);
             border-color: rgba(255, 62, 62, 0.3);
             transform: translateY(-2px);
+        }
+
+        .hud-btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, #d80027 100%);
+            box-shadow: 0 10px 25px rgba(216, 0, 39, 0.4);
+            border-color: transparent;
+        }
+
+        .hud-btn-primary:hover {
+            border-color: transparent;
+            box-shadow: 0 12px 30px rgba(216, 0, 39, 0.6);
         }
 
         /* Modal Overlay for displaying target image */
@@ -559,7 +572,10 @@
 
         <div class="hud-footer">
             <button class="hud-btn" id="view-target-hud-btn">
-                <span>📁</span> View Target Card
+                <span>📁</span> Target
+            </button>
+            <button class="hud-btn hud-btn-primary" id="shoot-web-btn">
+                <span>🕸️</span> THWIP!
             </button>
         </div>
     </div>
@@ -581,32 +597,67 @@
         color-space="sRGB" renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true;"
         vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
 
-        <!-- Camera -->
-        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+        <!-- Camera with 3D Interaction Cursor -->
+        <a-camera position="0 0 0" look-controls="enabled: false">
+            <a-cursor fuse="false" raycaster="objects: .clickable" color="#ff3e3e" scale="1.5 1.5 1.5"></a-cursor>
+        </a-camera>
 
         <!-- Image Target (targetIndex 0 corresponds to assets/targets.mind compilation) -->
         <a-entity mindar-image-target="targetIndex: 0" id="spider-target">
             
-            <!-- 3D Skyscraper Wall Backdrop -->
-            <a-plane color="#0b1d33" opacity="0.65" width="0.9" height="1.35" position="0 0 0.01" 
+            <!-- 3D Skyscraper Glass Doors (Slide open on scan) -->
+            <a-plane id="left-wall" color="#0b1d33" opacity="0.7" width="0.45" height="1.35" position="-0.225 0 0.01" 
+                     material="roughness: 0.1; metalness: 0.9;"></a-plane>
+            <a-plane id="right-wall" color="#0b1d33" opacity="0.7" width="0.45" height="1.35" position="0.225 0 0.01" 
                      material="roughness: 0.1; metalness: 0.9;"></a-plane>
             
-            <!-- Skyscraper Window Frames -->
-            <a-box color="#214068" width="0.012" height="1.35" depth="0.012" position="-0.45 0 0.015"></a-box>
-            <a-box color="#214068" width="0.012" height="1.35" depth="0.012" position="0.45 0 0.015"></a-box>
-            <a-box color="#214068" width="0.012" height="1.35" depth="0.012" position="0 0 0.015"></a-box>
-            <a-box color="#214068" width="0.9" height="0.012" depth="0.012" position="0 0.45 0.015"></a-box>
-            <a-box color="#214068" width="0.9" height="0.012" depth="0.012" position="0 -0.45 0.015"></a-box>
+            <!-- Skyscraper Window Outer Frames -->
+            <a-box color="#214068" width="0.015" height="1.35" depth="0.02" position="-0.45 0 0.015"></a-box>
+            <a-box color="#214068" width="0.015" height="1.35" depth="0.02" position="0.45 0 0.015"></a-box>
+            <a-box color="#214068" width="0.9" height="0.015" depth="0.02" position="0 0.675 0.015"></a-box>
+            <a-box color="#214068" width="0.9" height="0.015" depth="0.02" position="0 -0.675 0.015"></a-box>
+
+            <!-- Glowing Multiverse Portal (Behind Spiderman, scales up on scan) -->
+            <a-entity id="portal-ring" position="0 0.05 0.03" scale="0 0 0">
+                <a-torus color="#ff5e00" radius="0.32" radius-tubular="0.008" material="shader: flat; opacity: 0.85;"
+                         animation="property: rotation; to: 0 0 360; loop: true; dur: 3000; easing: linear"></a-torus>
+                <a-ring color="#ff9e00" radius-inner="0.30" radius-outer="0.32" material="shader: flat; opacity: 0.9;"
+                         animation="property: rotation; to: 0 0 -360; loop: true; dur: 5000; easing: linear"></a-ring>
+            </a-entity>
+
+            <!-- Comic Dialogue Quote Bubble (Floating above head, scales up) -->
+            <a-entity id="quote-bubble" position="0 0.44 0.1" scale="0 0 0">
+                <a-plane color="#0c101a" opacity="0.8" width="0.65" height="0.12" material="roughness: 0.5; metalness: 0.2;"
+                         geometry="primitive: plane; width: 0.65; height: 0.12;"></a-plane>
+                <a-text id="quote-text" value="With great power comes great responsibility." 
+                        align="center" width="0.6" color="#ffffff" font="mozillavr" position="0 0 0.01"></a-text>
+            </a-entity>
+
+            <!-- 3D Suit Selector Cards (Clickable buttons at the bottom of the card) -->
+            <!-- Classic Red & Blue Suit Selector Button -->
+            <a-circle class="suit-card clickable" id="btn-classic" radius="0.065" color="#d32f2f" position="-0.22 -0.48 0.08" scale="0 0 0">
+                <a-text value="CLASSIC" align="center" width="0.75" position="0 -0.01 0.01" color="#ffffff" font="mozillavr"></a-text>
+            </a-circle>
+            
+            <!-- Miles Morales (Spider-Verse) Suit Selector Button -->
+            <a-circle class="suit-card clickable" id="btn-miles" radius="0.065" color="#111111" position="0 -0.48 0.08" scale="0 0 0" material="border: 2px solid #d32f2f">
+                <a-text value="MILES" align="center" width="0.75" position="0 -0.01 0.01" color="#d32f2f" font="mozillavr"></a-text>
+            </a-circle>
+
+            <!-- Spider-Man 2099 Futuristic Suit Selector Button -->
+            <a-circle class="suit-card clickable" id="btn-2099" radius="0.065" color="#07111e" position="0.22 -0.48 0.08" scale="0 0 0">
+                <a-text value="2099" align="center" width="0.75" position="0 -0.01 0.01" color="#ff003c" font="mozillavr"></a-text>
+            </a-circle>
 
             <!-- Stylized Upside-Down Spider-Man Character (Stylized Low-Poly) -->
             <a-entity id="spiderman-character" 
                       position="0 0 0.08" 
                       rotation="0 0 180" 
-                      animation="property: position; from: 0 -0.15 0.08; to: 0 0.15 0.08; dir: alternate; loop: true; dur: 4500; easing: easeInOutSine"
+                      animation="property: position; from: 0 -0.12 0.08; to: 0 0.12 0.08; dir: alternate; loop: true; dur: 4500; easing: easeInOutSine"
                       animation__sway="property: rotation; from: 0 0 172; to: 0 0 188; dir: alternate; loop: true; dur: 3200; easing: easeInOutSine">
                 
                 <!-- Head -->
-                <a-sphere color="#d32f2f" radius="0.06" scale="1 1.25 1" position="0 0.18 0.03"></a-sphere>
+                <a-sphere class="spidey-red" color="#d32f2f" radius="0.06" scale="1 1.25 1" position="0 0.18 0.03"></a-sphere>
                 
                 <!-- Eyes (Black outline + White centers) -->
                 <a-circle color="#000000" radius="0.018" position="-0.02 0.18 0.088" scale="1 1.6 1" rotation="0 0 -22"></a-circle>
@@ -615,31 +666,31 @@
                 <a-circle color="#ffffff" radius="0.013" position="0.018 0.18 0.09" scale="1 1.6 1" rotation="0 0 22"></a-circle>
                 
                 <!-- Torso (Red upper body + Blue lower body) -->
-                <a-box color="#d32f2f" width="0.09" height="0.15" depth="0.06" position="0 0.06 0.02"></a-box>
-                <a-box color="#0d47a1" width="0.09" height="0.06" depth="0.06" position="0 -0.04 0.02"></a-box>
+                <a-box class="spidey-red" color="#d32f2f" width="0.09" height="0.15" depth="0.06" position="0 0.06 0.02"></a-box>
+                <a-box class="spidey-blue" color="#0d47a1" width="0.09" height="0.06" depth="0.06" position="0 -0.04 0.02"></a-box>
 
                 <!-- Spider Logo on Chest -->
-                <a-circle color="#000000" radius="0.008" position="0 0.07 0.052" scale="1 1.5 1"></a-circle>
+                <a-circle class="spidey-logo" color="#000000" radius="0.008" position="0 0.07 0.052" scale="1 1.5 1"></a-circle>
                 
                 <!-- Left Arm (Clinging pose) -->
-                <a-cylinder color="#d32f2f" radius="0.014" height="0.08" position="-0.07 0.09 0.02" rotation="40 0 -35"></a-cylinder>
-                <a-cylinder color="#0d47a1" radius="0.011" height="0.08" position="-0.1 0.03 0.04" rotation="20 0 -50"></a-cylinder>
+                <a-cylinder class="spidey-red" color="#d32f2f" radius="0.014" height="0.08" position="-0.07 0.09 0.02" rotation="40 0 -35"></a-cylinder>
+                <a-cylinder class="spidey-blue" color="#0d47a1" radius="0.011" height="0.08" position="-0.1 0.03 0.04" rotation="20 0 -50"></a-cylinder>
                 
                 <!-- Right Arm (Web-Shooting Pose) -->
-                <a-cylinder color="#d32f2f" radius="0.014" height="0.08" position="0.07 0.09 0.02" rotation="45 0 35"></a-cylinder>
-                <a-cylinder color="#d32f2f" radius="0.011" height="0.08" position="0.12 0.13 0.06" rotation="90 0 45"></a-cylinder>
+                <a-cylinder class="spidey-red" color="#d32f2f" radius="0.014" height="0.08" position="0.07 0.09 0.02" rotation="45 0 35"></a-cylinder>
+                <a-cylinder class="spidey-red" color="#d32f2f" radius="0.011" height="0.08" position="0.12 0.13 0.06" rotation="90 0 45"></a-cylinder>
                 
-                <!-- 3D Web Thread Shooting Out -->
+                <!-- 3D Web Thread Shooting Out to side -->
                 <a-cylinder color="#ffffff" radius="0.002" height="1.4" position="0.32 0.52 0.05" rotation="-42 0 18" 
                             opacity="0.85" material="shader: flat;"></a-cylinder>
 
                 <!-- Left Leg (Clinging) -->
-                <a-cylinder color="#0d47a1" radius="0.016" height="0.09" position="-0.04 -0.09 0.02" rotation="-25 25 -15"></a-cylinder>
-                <a-cylinder color="#d32f2f" radius="0.013" height="0.08" position="-0.07 -0.15 0.04" rotation="-55 15 -10"></a-cylinder>
+                <a-cylinder class="spidey-blue" color="#0d47a1" radius="0.016" height="0.09" position="-0.04 -0.09 0.02" rotation="-25 25 -15"></a-cylinder>
+                <a-cylinder class="spidey-red" color="#d32f2f" radius="0.013" height="0.08" position="-0.07 -0.15 0.04" rotation="-55 15 -10"></a-cylinder>
 
                 <!-- Right Leg (Clinging) -->
-                <a-cylinder color="#0d47a1" radius="0.016" height="0.09" position="0.04 -0.09 0.02" rotation="-25 -25 15"></a-cylinder>
-                <a-cylinder color="#d32f2f" radius="0.013" height="0.08" position="0.07 -0.15 0.04" rotation="-55 -15 10"></a-cylinder>
+                <a-cylinder class="spidey-blue" color="#0d47a1" radius="0.016" height="0.09" position="0.04 -0.09 0.02" rotation="-25 -25 15"></a-cylinder>
+                <a-cylinder class="spidey-red" color="#d32f2f" radius="0.013" height="0.08" position="0.07 -0.15 0.04" rotation="-55 -15 10"></a-cylinder>
 
             </a-entity>
 
@@ -665,6 +716,8 @@
         const viewTargetBtn = document.getElementById('view-target-btn');
         const viewTargetHudBtn = document.getElementById('view-target-hud-btn');
         const modalCloseBtn = document.getElementById('modal-close-btn');
+        
+        const shootWebBtn = document.getElementById('shoot-web-btn');
 
         const sceneEl = document.querySelector('a-scene');
         const spiderTarget = document.getElementById('spider-target');
@@ -694,15 +747,117 @@
             if (e.target === targetModal) closeModal();
         });
 
+        // Interactive Suit Configuration Logic
+        const suitColors = {
+            classic: {
+                red: "#d32f2f",
+                blue: "#0d47a1",
+                logo: "#000000"
+            },
+            miles: {
+                red: "#141416",
+                blue: "#d32f2f",
+                logo: "#e53935"
+            },
+            2099: {
+                red: "#07111e",
+                blue: "#ff003c",
+                logo: "#ff003c"
+            }
+        };
+
+        const quotes = {
+            classic: "With great power comes great responsibility.",
+            miles: "Anyone can wear the mask.",
+            2099: "I am the futuristic Spider-Man."
+        };
+
+        function setSuit(suitType) {
+            const colors = suitColors[suitType];
+            document.querySelectorAll('.spidey-red').forEach(el => el.setAttribute('color', colors.red));
+            document.querySelectorAll('.spidey-blue').forEach(el => el.setAttribute('color', colors.blue));
+            document.querySelectorAll('.spidey-logo').forEach(el => el.setAttribute('color', colors.logo));
+            
+            // Update speech bubble text
+            document.getElementById('quote-text').setAttribute('value', quotes[suitType]);
+            
+            // Quick visual tap feedback on HUD badge
+            statusText.textContent = `Suit: ${suitType.toUpperCase()}`;
+            setTimeout(() => {
+                statusText.textContent = "Target Locked: Spider-Man";
+            }, 2000);
+        }
+
+        document.getElementById('btn-classic').addEventListener('click', () => setSuit('classic'));
+        document.getElementById('btn-miles').addEventListener('click', () => setSuit('miles'));
+        document.getElementById('btn-2099').addEventListener('click', () => setSuit('2099'));
+
+        // Interactive 3D Web Shooter
+        shootWebBtn.addEventListener('click', () => {
+            // Create a temporary 3D web projectile sphere
+            const web = document.createElement('a-sphere');
+            web.setAttribute('color', '#ffffff');
+            web.setAttribute('radius', '0.015');
+            
+            // Position near Spider-Man's forward-pointing hand (taking parent scale into account)
+            web.setAttribute('position', '0.1 0.12 0.08'); 
+            web.setAttribute('material', 'shader: flat; opacity: 0.95;');
+            
+            // Shoot web directly towards phone camera (Z direction)
+            web.setAttribute('animation', 'property: position; to: 0 0 0.8; dur: 500; easing: easeOutQuad;');
+            web.setAttribute('animation__scale', 'property: scale; to: 25 25 25; dur: 500; easing: easeOutQuad;');
+            web.setAttribute('animation__opacity', 'property: opacity; to: 0; dur: 500; easing: easeInQuad;');
+            
+            spiderTarget.appendChild(web);
+            
+            // Delete projectile after animation is complete
+            setTimeout(() => {
+                web.remove();
+            }, 500);
+        });
+
         // MindAR Event Listeners for Target tracking status updates
         spiderTarget.addEventListener('targetFound', () => {
             scanningHud.classList.add('detected');
             statusText.textContent = "Target Locked: Spider-Man";
+
+            // 1. Slide open the skyscraper glass panels
+            document.getElementById('left-wall').setAttribute('animation', 'property: position; to: -0.675 0 0.01; dur: 1200; easing: easeOutQuad; fill: forwards');
+            document.getElementById('right-wall').setAttribute('animation', 'property: position; to: 0.675 0 0.01; dur: 1200; easing: easeOutQuad; fill: forwards');
+            
+            // 2. Open Multiverse Portal (scale up)
+            document.getElementById('portal-ring').setAttribute('animation', 'property: scale; from: 0 0 0; to: 1 1 1; dur: 1000; easing: easeOutBack; fill: forwards');
+            
+            // 3. Float in the Suit Selector cards with staggered delays
+            document.querySelectorAll('.suit-card').forEach((card, idx) => {
+                card.setAttribute('animation', `property: scale; from: 0 0 0; to: 1 1 1; dur: 800; delay: ${300 + idx * 150}; easing: easeOutBack; fill: forwards`);
+            });
+
+            // 4. Scale up quote speech bubble
+            document.getElementById('quote-bubble').setAttribute('animation', 'property: scale; from: 0 0 0; to: 1 1 1; dur: 1000; delay: 800; easing: easeOutBack; fill: forwards');
         });
 
         spiderTarget.addEventListener('targetLost', () => {
             scanningHud.classList.remove('detected');
             statusText.textContent = "Scanning Target...";
+
+            // Reset elements back to default states instantly to prevent layout leaks
+            document.getElementById('left-wall').removeAttribute('animation');
+            document.getElementById('left-wall').setAttribute('position', '-0.225 0 0.01');
+            
+            document.getElementById('right-wall').removeAttribute('animation');
+            document.getElementById('right-wall').setAttribute('position', '0.225 0 0.01');
+            
+            document.getElementById('portal-ring').removeAttribute('animation');
+            document.getElementById('portal-ring').setAttribute('scale', '0 0 0');
+            
+            document.querySelectorAll('.suit-card').forEach(card => {
+                card.removeAttribute('animation');
+                card.setAttribute('scale', '0 0 0');
+            });
+
+            document.getElementById('quote-bubble').removeAttribute('animation');
+            document.getElementById('quote-bubble').setAttribute('scale', '0 0 0');
         });
     </script>
 </body>
